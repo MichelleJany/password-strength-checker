@@ -1,7 +1,9 @@
 
 from pickletools import read_stringnl_noescape_pair
+import math
 import string
 from pathlib import Path
+import os
 
 # Constants
 # Lengths
@@ -16,8 +18,6 @@ WEAK_THRESHOLD = 3
 NORMAL_THRESHOLD = 6
 
 score = 0
-
-password = "fFgmDt8t4utfmffmfmf!!!---ttzujfffFF::GGJJ887!"
 
 script_dir = Path(__file__).parent
 file_path = script_dir / 'passwords.txt'
@@ -56,13 +56,42 @@ def get_strength_category(score):
     else:
         return "Strong"
 
+def calculate_entropy(password):
+    charset_size = 0
+    if any(c in string.ascii_lowercase for c in password):
+        charset_size += 26
+    if any(c in string.ascii_uppercase for c in password):
+        charset_size += 26
+    if any(c in string.digits for c in password):
+        charset_size += 10
+    if any(c in string.punctuation for c in password):
+        charset_size += len(string.punctuation)
+    if any(ord(c) > 127 for c in password):
+        charset_size += 100
+
+    # Add more for extra characters as needed
+    if charset_size == 0:
+        return 0
+    return len(password) * math.log2(charset_size)
+
+def estimate_crack_time_seconds(entropy_bits, guesses_per_second=1e10):
+    return 2 ** entropy_bits / guesses_per_second
+
+
 def evaluate_password(password, common):
     if check_common(password, common):
         return "Password is common. Strength: Weak"
     score = check_char_type(password)
     score += check_length(password)
     category = get_strength_category(score)
-    return f"Password strength: {category}"
+    entropy = calculate_entropy(password)
+    crack_time_seconds = estimate_crack_time_seconds(entropy)
+    seconds_per_year = 60 * 60 * 24 * 365.25
+    crack_time_years = crack_time_seconds / seconds_per_year
+
+    return (f"Password strength: {category}\n"
+            f"Entropy: {entropy:.2f} bits\n"
+            f"Estimate time to crack: {crack_time_years:.2e} years")
 
 def main():
     password = get_password_from_user()
