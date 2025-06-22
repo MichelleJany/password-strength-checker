@@ -6,6 +6,14 @@ from pathlib import Path
 import os
 
 # Constants
+DEFAULT_POLICY = {
+    'min_length': 8,
+    'require_upper': True,
+    'require_lower': True,
+    'require_digit': True,
+    'require_special': True
+}
+
 # Lengths
 MIN_LENGTH = 8
 MED_LENGTH = 12
@@ -28,7 +36,46 @@ with file_path.open('r') as f:
 def get_password_from_user():
     return input("Enter your password: ")
 
-def check_char_type (password):
+def get_user_policy():
+    print("Would you like to customise the password policy? (y/n, default n)")
+
+    choice = input().strip().lower()
+    if choice != 'y':
+        return DEFAULT_POLICY.copy()
+
+    min_length = input(f"Minimum password length? (default {DEFAULT_POLICY['min_length']}): ").strip()
+    min_length = int(min_length) if min_length else DEFAULT_POLICY['min_length']
+
+    require_upper = input("Require uppercase? (y/n, default y): ").strip().lower()
+    require_upper = require_upper != 'n'
+
+    require_lower = input("Require lowercase? (y/n, default y): ").strip().lower()
+    require_lower = require_lower != 'n'
+
+    require_digit = input("Require digit? (y/n, default y): ").strip().lower()
+    require_digit = require_digit != 'n'
+
+    require_special = input("Require special character? (y/n, default y): ").strip().lower()
+    require_special = require_special != 'n'
+
+    return {
+        'min_length': min_length,
+        'require_upper': require_upper,
+        'require_lower': require_lower,
+        'require_digit': require_digit,
+        'require_special': require_special}
+
+def check_char_type (password, policy):
+    if policy['require_upper'] and not any(c.isupper() for c in password):
+        return False, "Add at least one uppercase letter."
+    if policy['require_lower'] and not any(c.islower() for c in password):
+        return False, "Add at least one lowercase letter."
+    if policy['require_digit'] and not any(c.isdigit() for c in password):
+        return False, "Add at least one digit."
+    if policy['require_special'] and not any(c in string.punctuation for c in password):
+        return False, "Add at least one special character."
+    return True, ""
+
     # Check character types
     upper_case = any(c in string.ascii_uppercase for c in password)
     lower_case = any(c in string.ascii_lowercase for c in password)
@@ -45,8 +92,10 @@ def check_common (password, common):
     # Check if common
     return password in common
 
-def check_length(password):
-    return sum(1 for threshold in LENGTH_THRESHOLDS if len(password) > threshold)
+def check_length(password, policy):
+    if len(password) < policy['min_length']:
+        return False, f"Password should be at least {policy['min_length']} characters long."
+    return True, ""
 
 def get_strength_category(score):
     if score <= WEAK_THRESHOLD:
@@ -107,11 +156,17 @@ def get_password_suggestions(password, common):
 
     return suggestions
 
-def evaluate_password(password, common):
+def evaluate_password(password, common, policy):
     if check_common(password, common):
         return "Password is common. Strength: Weak"
-    score = check_char_type(password)
-    score += check_length(password)
+    types_ok, types_msg = check_char_type(password, policy)
+    length_ok, length_msg = check_length(password, policy)
+    score = 0
+    if types_ok:
+        score += 1
+    if length_ok:
+        score += 1
+
     category = get_strength_category(score)
     entropy = calculate_entropy(password)
     crack_time_seconds = estimate_crack_time_seconds(entropy)
@@ -126,12 +181,14 @@ def evaluate_password(password, common):
 
     if suggestions:
         result += "\nSuggestions:\n- " + "\n- ".join(suggestions)
-    return result
-        
+    return result      
+
 def main():
+    policy = get_user_policy()
     password = get_password_from_user()
-    result = evaluate_password(password, common)
+    result = evaluate_password(password, common, policy)
     print(result)
+
 
 if __name__ == "__main__":
     main()
