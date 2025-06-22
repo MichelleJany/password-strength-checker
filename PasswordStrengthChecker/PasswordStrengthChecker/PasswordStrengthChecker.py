@@ -1,11 +1,9 @@
 
-from pickletools import read_stringnl_noescape_pair
 import math
 import string
 from pathlib import Path
-import os
 
-# Constants
+# ===== Constants ====
 DEFAULT_POLICY = {
     'min_length': 8,
     'require_upper': True,
@@ -14,31 +12,18 @@ DEFAULT_POLICY = {
     'require_special': True
 }
 
-# Lengths
-MIN_LENGTH = 8
-MED_LENGTH = 12
-LONG_LENGTH = 17
-V_LONG_LENGTH = 20
-LENGTH_THRESHOLDS = [MIN_LENGTH, MED_LENGTH, LONG_LENGTH, V_LONG_LENGTH]
-
-# Thresholds
-WEAK_THRESHOLD = 3
-NORMAL_THRESHOLD = 6
-
-score = 0
-
+# ==== Load Common Passwords ====
 script_dir = Path(__file__).parent
 file_path = script_dir / 'passwords.txt'
-
 with file_path.open('r') as f:
     common = f.read().splitlines()
 
+# ==== User Input Functions ====
 def get_password_from_user():
     return input("Enter your password: ")
 
 def get_user_policy():
     print("Would you like to customise the password policy? (y/n, default n)")
-
     choice = input().strip().lower()
     if choice != 'y':
         return DEFAULT_POLICY.copy()
@@ -65,42 +50,51 @@ def get_user_policy():
         'require_digit': require_digit,
         'require_special': require_special}
 
-def check_char_type (password, policy):
-    if policy['require_upper'] and not any(c.isupper() for c in password):
-        return False, "Add at least one uppercase letter."
-    if policy['require_lower'] and not any(c.islower() for c in password):
-        return False, "Add at least one lowercase letter."
-    if policy['require_digit'] and not any(c.isdigit() for c in password):
-        return False, "Add at least one digit."
-    if policy['require_special'] and not any(c in string.punctuation for c in password):
-        return False, "Add at least one special character."
-    return True, ""
-
-    # Check character types
-    upper_case = any(c in string.ascii_uppercase for c in password)
-    lower_case = any(c in string.ascii_lowercase for c in password)
-    special = any(c in string.punctuation for c in password)
-    digits = any(c in string.digits for c in password)
-
-    # Non-ASCII (accents, etc.)
-    non_ascii = any(ord(c) > 127 for c in password)
-
-    type_count = sum([upper_case, lower_case, special, digits])
-    return type_count - 1
-
+# ==== Password Checks ====
 def check_common (password, common):
     # Check if common
     return password in common
 
-def check_length(password, policy):
-    if len(password) < policy['min_length']:
-        return False, f"Password should be at least {policy['min_length']} characters long."
-    return True, ""
+def calculate_policy_score(password, policy):
+    score = 0
+    max_score = 0
 
-def get_strength_category(score):
-    if score <= WEAK_THRESHOLD:
+    # Length
+    max_score += 1
+    if len(password) >= policy['min_length']:
+        score += 1
+
+    # Uppercase
+    if policy['require_upper']:
+        max_score += 1
+        if any(c.isupper() for c in password):
+            score += 1
+
+    # Lowercase
+    if policy['require_lower']:
+        max_score += 1
+        if any(c.islower() for c in password):
+            score += 1
+
+    # Digit
+    if policy['require_digit']:
+        max_score += 1
+        if any(c.isdigit() for c in password):
+            score += 1
+
+    # Special
+    if policy['require_special']:
+        max_score += 1
+        if any(c in string.punctuation for c in password):
+            score += 1
+
+    return score, max_score
+
+def get_strength_category(score, max_score):
+    ratio = score / max_score if max_score else 0
+    if ratio < 0.05:
         return "Weak"
-    elif score <= NORMAL_THRESHOLD:
+    elif ratio < 0.08:
         return "Normal"
     else:
         return "Strong"
@@ -118,7 +112,6 @@ def calculate_entropy(password):
     if any(ord(c) > 127 for c in password):
         charset_size += 100
 
-    # Add more for extra characters as needed
     if charset_size == 0:
         return 0
     return len(password) * math.log2(charset_size)
@@ -126,23 +119,20 @@ def calculate_entropy(password):
 def estimate_crack_time_seconds(entropy_bits, guesses_per_second=1e10):
     return 2 ** entropy_bits / guesses_per_second
 
-def get_password_suggestions(password, common):
+# ==== Suggestions & Advice ====
+def get_password_suggestions(password, common, policy):
     suggestions = []
 
     # Length suggestions
-    if len(password) < MIN_LENGTH:
-        suggestions.append(f"Make your password at least {MIN_LENGTH} characters long.")
-    elif len(password) < MED_LENGTH:
-        suggestions.append(f"Longer passwords are stronger. Try to use at least {MIN_LENGTH} characters.")
-
-    # Character type suggestions
-    if not any(c in string.ascii_lowercase for c in password):
+    if len(password) < policy['min_length']:
+        suggestions.append(f"Make your password at least {policy['min_length']} characters long.")
+    if policy['require_lower'] and not any(c.islower() for c in password):
         suggestions.append("Add at least one lowercase letter.")
-    if not any(c in string.ascii_uppercase for c in password):
+    if policy['require_upper'] and not any(c.isupper() for c in password):
         suggestions.append("Add at least one uppercase letter.")
-    if not any(c in string.digits for c in password):
+    if policy['require_digit'] and not any(c.isdigit() for c in password):
         suggestions.append("Add at least one digit.")
-    if not any(c in string.punctuation for c in password):
+    if policy['require_special'] and not any(c in string.punctuation for c in password):
         suggestions.append("Add at least one special character (e.g., !, @, #, $).")
 
     # Common password suggestion
@@ -156,32 +146,43 @@ def get_password_suggestions(password, common):
 
     return suggestions
 
+def get_best_practice(password, policy):
+    advice = []
+    if not policy['require_lower'] and not any(c.islower() for c in password):
+        advice.append("Consider adding lowercase letters for even stronger security.")
+    if not policy['require_upper'] and not any(c.isupper() for c in password):
+        advice.append("Consider adding uppercase letters for even stronger security.")
+    if not policy['require_digit'] and not any(c.isdigit() for c in password):
+        advice.append("Consider adding digits for even stronger security.")
+    if not policy['require_special'] and not any(c in string.punctuation for c in password):
+        advice.append("Consider adding special characters for even stronger security.")
+    return advice
+
+# ==== Main Evaluation ====
 def evaluate_password(password, common, policy):
     if check_common(password, common):
         return "Password is common. Strength: Weak"
-    types_ok, types_msg = check_char_type(password, policy)
-    length_ok, length_msg = check_length(password, policy)
-    score = 0
-    if types_ok:
-        score += 1
-    if length_ok:
-        score += 1
 
-    category = get_strength_category(score)
+    score, max_score = calculate_policy_score(password, policy)
+    category = get_strength_category(score, max_score)
     entropy = calculate_entropy(password)
     crack_time_seconds = estimate_crack_time_seconds(entropy)
     seconds_per_year = 60 * 60 * 24 * 365.25
     crack_time_years = crack_time_seconds / seconds_per_year
 
-    suggestions = get_password_suggestions(password, common) if category != "Strong" else []
+    suggestions = get_password_suggestions(password, common, policy) if category != "Strong" else []
+    best_practice = get_best_practice(password, policy)
 
-    result = (f"Password strength: {category}\n"
+    result = (f"\nPassword Strength: {category}\n"
+              f"Score: {score} / {max_score}\n"
               f"Entropy: {entropy:.2f} bits\n"
-              f"Estimated time to crack {crack_time_years:.2e} years")
+              f"Estimated time to crack: {crack_time_years:.2e} years")
 
     if suggestions:
         result += "\nSuggestions:\n- " + "\n- ".join(suggestions)
-    return result      
+    if best_practice:
+        result += "\nBest practice advice:\n- " + "\n- ".join(best_practice)
+    return result
 
 def main():
     policy = get_user_policy()
