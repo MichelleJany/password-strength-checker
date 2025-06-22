@@ -90,11 +90,14 @@ def calculate_policy_score(password, policy):
 
     return score, max_score
 
-def get_strength_category(score, max_score):
+def get_strength_category(score, max_score, entropy, crack_time_years):
     ratio = score / max_score if max_score else 0
-    if ratio < 0.05:
+    # Realistic thresholds
+    if entropy < 40 or crack_time_years < 1:
         return "Weak"
-    elif ratio < 0.08:
+    if ratio < 0.5:
+        return "Weak"
+    elif ratio < 0.8:
         return "Normal"
     else:
         return "Strong"
@@ -158,25 +161,46 @@ def get_best_practice(password, policy):
         advice.append("Consider adding special characters for even stronger security.")
     return advice
 
+def format_crack_time(crack_time_years):
+    try:
+        if crack_time_years > 1e12:
+            trillions = crack_time_years / 1e12
+            return f"{trillions:,.2f} trillion years"
+        elif crack_time_years > 1e9:
+            billions = crack_time_years / 1e9
+            return f"{billions:,.2f} billion years"
+        elif crack_time_years > 1e6:
+            millions = crack_time_years / 1e6
+            return f"{millions:,.2f} million years"
+        elif crack_time_years > 1e3:
+            thousands = crack_time_years / 1e3
+            return f"{thousands:,.2f} thousand years"
+        else:
+            return f"{int(crack_time_years):,} years"
+    except Exception:
+        return str(crack_time_years) + " years"
+       
+
 # ==== Main Evaluation ====
 def evaluate_password(password, common, policy):
     if check_common(password, common):
         return "Password is common. Strength: Weak"
 
     score, max_score = calculate_policy_score(password, policy)
-    category = get_strength_category(score, max_score)
     entropy = calculate_entropy(password)
     crack_time_seconds = estimate_crack_time_seconds(entropy)
     seconds_per_year = 60 * 60 * 24 * 365.25
     crack_time_years = crack_time_seconds / seconds_per_year
+    crack_time_str = format_crack_time(crack_time_years)
 
+    category = get_strength_category(score, max_score, entropy, crack_time_years)
     suggestions = get_password_suggestions(password, common, policy) if category != "Strong" else []
     best_practice = get_best_practice(password, policy)
 
     result = (f"\nPassword Strength: {category}\n"
               f"Score: {score} / {max_score}\n"
               f"Entropy: {entropy:.2f} bits\n"
-              f"Estimated time to crack: {crack_time_years:.2e} years")
+              f"Estimated time to crack: {crack_time_str}")
 
     if suggestions:
         result += "\nSuggestions:\n- " + "\n- ".join(suggestions)
