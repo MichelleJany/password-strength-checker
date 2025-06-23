@@ -2,6 +2,8 @@
 import math
 import string
 from pathlib import Path
+import hashlib
+import requests
 
 # ===== Constants ====
 DEFAULT_POLICY = {
@@ -54,6 +56,26 @@ def get_user_policy():
 def check_common (password, common):
     # Check if common
     return password in common
+
+def check_pwned_password(password):
+    # Hash password with SHA-1
+    sha1 = hashlib.sha1(password.encode('utf-8')).hexdigest().upper()
+    prefix = sha1[:5]
+    suffix = sha1[5:]
+
+    # Query HIBP API with first 5 characters
+    url = f"https://api.pwnedpasswords.com/range/{prefix}"
+    headers = {"User-Agent": "PasswordStrengthChecker"}
+    response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        return False, 0
+
+    hashes = (line.split(':') for line in response.text.splitlines())
+    for hash_suffix, count in hashes:
+        if hash_suffix == suffix:
+            return True, int(count)
+    return False, 0
 
 def calculate_policy_score(password, policy):
     score = 0
@@ -183,8 +205,15 @@ def format_crack_time(crack_time_years):
 
 # ==== Main Evaluation ====
 def evaluate_password(password, common, policy):
+    result_lines = []
     if check_common(password, common):
-        return "Password is common. Strength: Weak"
+        result_lines.append("WARNING: This password is on a common passwords list.")
+
+    breached, count = check_pwned_password(password)
+    if breached:
+        result_lines.append(f"WARNING: This password has appeared in {count:,} data breaches! Choose another.")
+    else:
+        result_lines.append("Good news: This password was not found in known breaches.")
 
     score, max_score = calculate_policy_score(password, policy)
     entropy = calculate_entropy(password)
@@ -197,16 +226,17 @@ def evaluate_password(password, common, policy):
     suggestions = get_password_suggestions(password, common, policy) if category != "Strong" else []
     best_practice = get_best_practice(password, policy)
 
-    result = (f"\nPassword Strength: {category}\n"
-              f"Score: {score} / {max_score}\n"
-              f"Entropy: {entropy:.2f} bits\n"
-              f"Estimated time to crack: {crack_time_str}")
+    result_lines.append(f"\nPassword Strength: {category}")
+    result_lines.append(f"Score: {score} / {max_score}")
+    result_lines.append(f"Entropy: {entropy:.2f} bits\n")
+    result_lines.append(f"Estimated time to crack: {crack_time_str}")
 
     if suggestions:
-        result += "\nSuggestions:\n- " + "\n- ".join(suggestions)
+        result_lines.append("Suggestions:\n- " + "\n- ".join(suggestions))
     if best_practice:
-        result += "\nBest practice advice:\n- " + "\n- ".join(best_practice)
-    return result
+        result_lines.append("Best practice advice:\n- " + "\n- ".join(best_practice))
+
+    return "\n".join(result_lines)
 
 def main():
     policy = get_user_policy()
