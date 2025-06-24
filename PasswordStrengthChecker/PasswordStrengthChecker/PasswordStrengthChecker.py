@@ -4,6 +4,9 @@ import string
 from pathlib import Path
 import hashlib
 import requests
+import tkinter as tk
+from tkinter import messagebox
+import re
 
 # ===== Constants ====
 DEFAULT_POLICY = {
@@ -20,38 +23,6 @@ file_path = script_dir / 'passwords.txt'
 with file_path.open('r') as f:
     common = f.read().splitlines()
 
-# ==== User Input Functions ====
-def get_password_from_user():
-    return input("Enter your password: ")
-
-def get_user_policy():
-    print("Would you like to customise the password policy? (y/n, default n)")
-    choice = input().strip().lower()
-    if choice != 'y':
-        return DEFAULT_POLICY.copy()
-
-    min_length = input("Minimum password length? (default {DEFAULT_POLICY['min_length']}): ").strip()
-    min_length = int(min_length) if min_length else DEFAULT_POLICY['min_length']
-
-    require_upper = input("Require uppercase? (y/n, default y): ").strip().lower()
-    require_upper = require_upper != 'n'
-
-    require_lower = input("Require lowercase? (y/n, default y): ").strip().lower()
-    require_lower = require_lower != 'n'
-
-    require_digit = input("Require digit? (y/n, default y): ").strip().lower()
-    require_digit = require_digit != 'n'
-
-    require_special = input("Require special character? (y/n, default y): ").strip().lower()
-    require_special = require_special != 'n'
-
-    return {
-        'min_length': min_length,
-        'require_upper': require_upper,
-        'require_lower': require_lower,
-        'require_digit': require_digit,
-        'require_special': require_special}
-
 # ==== Password Checks ====
 def check_common (password, common):
     # Check if common
@@ -62,15 +33,11 @@ def check_pwned_password(password):
     sha1 = hashlib.sha1(password.encode('utf-8')).hexdigest().upper()
     prefix = sha1[:5]
     suffix = sha1[5:]
-
-    # Query HIBP API with first 5 characters
     url = f"https://api.pwnedpasswords.com/range/{prefix}"
     headers = {"User-Agent": "PasswordStrengthChecker"}
     response = requests.get(url, headers=headers)
-
     if response.status_code != 200:
         return False, 0
-
     hashes = (line.split(':') for line in response.text.splitlines())
     for hash_suffix, count in hashes:
         if hash_suffix == suffix:
@@ -85,31 +52,26 @@ def calculate_policy_score(password, policy):
     max_score += 1
     if len(password) >= policy['min_length']:
         score += 1
-
     # Uppercase
     if policy['require_upper']:
         max_score += 1
         if any(c.isupper() for c in password):
             score += 1
-
     # Lowercase
     if policy['require_lower']:
         max_score += 1
         if any(c.islower() for c in password):
             score += 1
-
     # Digit
     if policy['require_digit']:
         max_score += 1
         if any(c.isdigit() for c in password):
             score += 1
-
     # Special
     if policy['require_special']:
         max_score += 1
         if any(c in string.punctuation for c in password):
             score += 1
-
     return score, max_score
 
 def get_strength_category(score, max_score, entropy, crack_time_years):
@@ -136,52 +98,12 @@ def calculate_entropy(password):
         charset_size += len(string.punctuation)
     if any(ord(c) > 127 for c in password):
         charset_size += 100
-
     if charset_size == 0:
         return 0
     return len(password) * math.log2(charset_size)
 
 def estimate_crack_time_seconds(entropy_bits, guesses_per_second=1e10):
     return 2 ** entropy_bits / guesses_per_second
-
-# ==== Suggestions & Advice ====
-def get_password_suggestions(password, common, policy):
-    suggestions = []
-
-    # Length suggestions
-    if len(password) < policy['min_length']:
-        suggestions.append(f"Make your password at least {policy['min_length']} characters long.")
-    if policy['require_lower'] and not any(c.islower() for c in password):
-        suggestions.append("Add at least one lowercase letter.")
-    if policy['require_upper'] and not any(c.isupper() for c in password):
-        suggestions.append("Add at least one uppercase letter.")
-    if policy['require_digit'] and not any(c.isdigit() for c in password):
-        suggestions.append("Add at least one digit.")
-    if policy['require_special'] and not any(c in string.punctuation for c in password):
-        suggestions.append("Add at least one special character (e.g., !, @, #, $).")
-
-    # Common password suggestion
-    if password in common:
-        suggestions.append("Avoid using common passwords.")
-
-    # Entropy suggestion
-    entropy = calculate_entropy(password)
-    if entropy < 40:
-        suggestions.append("Increase password complexity for higher entropy (more unpredictability).")
-
-    return suggestions
-
-def get_best_practice(password, policy):
-    advice = []
-    if not policy['require_lower'] and not any(c.islower() for c in password):
-        advice.append("Consider adding lowercase letters for even stronger security.")
-    if not policy['require_upper'] and not any(c.isupper() for c in password):
-        advice.append("Consider adding uppercase letters for even stronger security.")
-    if not policy['require_digit'] and not any(c.isdigit() for c in password):
-        advice.append("Consider adding digits for even stronger security.")
-    if not policy['require_special'] and not any(c in string.punctuation for c in password):
-        advice.append("Consider adding special characters for even stronger security.")
-    return advice
 
 def format_crack_time(crack_time_years):
     try:
@@ -201,7 +123,42 @@ def format_crack_time(crack_time_years):
             return f"{int(crack_time_years):,} years"
     except Exception:
         return str(crack_time_years) + " years"
-       
+
+# ==== Suggestions & Advice ====
+def get_password_suggestions(password, common, policy):
+    suggestions = []
+
+    # Length suggestions
+    if len(password) < policy['min_length']:
+        suggestions.append(f"Make your password at least {policy['min_length']} characters long.")
+    if policy['require_lower'] and not any(c.islower() for c in password):
+        suggestions.append("Add at least one lowercase letter.")
+    if policy['require_upper'] and not any(c.isupper() for c in password):
+        suggestions.append("Add at least one uppercase letter.")
+    if policy['require_digit'] and not any(c.isdigit() for c in password):
+        suggestions.append("Add at least one digit.")
+    if policy['require_special'] and not any(c in string.punctuation for c in password):
+        suggestions.append("Add at least one special character (e.g., !, @, #, $).")
+    # Common password suggestion
+    if password in common:
+        suggestions.append("Avoid using common passwords.")
+    # Entropy suggestion
+    entropy = calculate_entropy(password)
+    if entropy < 40:
+        suggestions.append("Increase password complexity for higher entropy (more unpredictability).")
+    return suggestions
+
+def get_best_practice(password, policy):
+    advice = []
+    if not policy['require_lower'] and not any(c.islower() for c in password):
+        advice.append("Consider adding lowercase letters for even stronger security.")
+    if not policy['require_upper'] and not any(c.isupper() for c in password):
+        advice.append("Consider adding uppercase letters for even stronger security.")
+    if not policy['require_digit'] and not any(c.isdigit() for c in password):
+        advice.append("Consider adding digits for even stronger security.")
+    if not policy['require_special'] and not any(c in string.punctuation for c in password):
+        advice.append("Consider adding special characters for even stronger security.")
+    return advice
 
 # ==== Main Evaluation ====
 def evaluate_password(password, common, policy):
@@ -229,7 +186,7 @@ def evaluate_password(password, common, policy):
     result_lines.append(f"\nPassword Strength: {category}")
     result_lines.append(f"Score: {score} / {max_score}")
     result_lines.append(f"Entropy: {entropy:.2f} bits\n")
-    result_lines.append(f"Estimated time to crack: {crack_time_str}")
+    result_lines.append(f"Estimated time to crack: {crack_time_str}\n")
 
     if suggestions:
         result_lines.append("Suggestions:\n- " + "\n- ".join(suggestions))
@@ -238,14 +195,39 @@ def evaluate_password(password, common, policy):
 
     return "\n".join(result_lines)
 
-def main():
-    policy = get_user_policy()
-    password = get_password_from_user()
-    result = evaluate_password(password, common, policy)
-    print(result)
+# ==== Tkinter ====
+root = tk.Tk()
+root.title("Password Checker")
+root.geometry("400x400")
 
+password_var = tk.StringVar()
 
-if __name__ == "__main__":
-    main()
-   
+label = tk.Label(root, text="Enter Password:")
+label.pack(pady=10)
 
+password_entry = tk.Entry(root, textvariable=password_var, width=30, show='*')
+password_entry.pack(pady=5)
+
+show_password_var = tk.BooleanVar()
+def toggle_password_visibility():
+    if show_password_var.get():
+        password_entry.config(show="")
+    else:
+        password_entry.config(show="*")
+
+show_password_check = tk.Checkbutton(root, text="Show Password", variable=show_password_var, command=toggle_password_visibility)
+show_password_check.pack(pady=5)
+
+result_label = tk.Label(root, text="", wraplength=380, justify="left")
+result_label.pack(pady=10)
+
+def check_password(event=None):
+    pw = password_var.get()
+    result = evaluate_password(pw, common, DEFAULT_POLICY)
+    result_label.config(text=result)
+
+password_entry.bind('<Return>', check_password)
+check_button = tk.Button(root, text="Check Password", command=check_password)
+check_button.pack()
+    
+root.mainloop()
