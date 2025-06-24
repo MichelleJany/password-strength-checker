@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 import os
-from test_password_strength import (
+from PasswordStrengthChecker import (
     calculate_policy_score,
     calculate_entropy,
     check_common,
