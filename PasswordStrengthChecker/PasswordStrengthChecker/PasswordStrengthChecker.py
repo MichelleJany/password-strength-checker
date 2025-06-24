@@ -30,7 +30,7 @@ def get_user_policy():
     if choice != 'y':
         return DEFAULT_POLICY.copy()
 
-    min_length = input(f"Minimum password length? (default {DEFAULT_POLICY['min_length']}): ").strip()
+    min_length = input("Minimum password length? (default {DEFAULT_POLICY['min_length']}): ").strip()
     min_length = int(min_length) if min_length else DEFAULT_POLICY['min_length']
 
     require_upper = input("Require uppercase? (y/n, default y): ").strip().lower()
