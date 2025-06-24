@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="5" time="0.322" timestamp="2025-06-24T19:34:53.921454+02:00" hostname="MSI"><testcase classname="test_1.Test_test_1" name="test_A" file="test_1.py" line="3" time="0.001"><failure message="AssertionError: Not implemented">self = &lt;test_1.Test_test_1 testMethod=test_A&gt;
+
+    def test_A(self):
+&gt;       self.fail("Not implemented")
+E       AssertionError: Not implemented
+
+test_1.py:5: AssertionError</failure><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="tests.test_password_strength.TestPasswordChecker" name="test_common_password" file="tests\test_password_strength.py" line="29" time="0.001"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="tests.test_password_strength.TestPasswordChecker" name="test_entropy" file="tests\test_password_strength.py" line="24" time="0.001"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="tests.test_password_strength.TestPasswordChecker" name="test_policy_score_strong" file="tests\test_password_strength.py" line="12" time="0.000"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="tests.test_password_strength.TestPasswordChecker" name="test_policy_score_weak" file="tests\test_password_strength.py" line="18" time="0.000"><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase></testsuite></testsuites>
